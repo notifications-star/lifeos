@@ -2,13 +2,18 @@
 -- Run this SQL in your Supabase Dashboard:
 -- SQL Editor → New Query → Paste & Run
 -- ================================================
+-- If you already created the old table, drop it first:
+DROP TABLE IF EXISTS user_profiles;
 
 CREATE TABLE user_profiles (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
 
   -- Profile
   name TEXT,
+  email TEXT,
   timezone TEXT NOT NULL DEFAULT 'UTC',
   wake_time TIME NOT NULL DEFAULT '07:00',
   sleep_time TIME NOT NULL DEFAULT '23:00',
@@ -31,20 +36,33 @@ CREATE TABLE user_profiles (
 
   -- Permissions
   permission_location BOOLEAN NOT NULL DEFAULT false,
-  permission_motion BOOLEAN NOT NULL DEFAULT false
+  permission_motion BOOLEAN NOT NULL DEFAULT false,
+
+  -- Onboarding status
+  onboarding_complete BOOLEAN NOT NULL DEFAULT false
 );
 
--- Allow anonymous inserts (since we don't have auth yet)
+-- Row Level Security
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow anonymous inserts"
+-- Users can insert their own profile
+CREATE POLICY "Users can insert own profile"
   ON user_profiles
   FOR INSERT
-  TO anon
-  WITH CHECK (true);
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Allow anonymous reads"
+-- Users can read their own profile
+CREATE POLICY "Users can read own profile"
   ON user_profiles
   FOR SELECT
-  TO anon
-  USING (true);
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile"
+  ON user_profiles
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
