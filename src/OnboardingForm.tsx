@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 
 // ---------- Types ----------
 interface OnboardingData {
@@ -66,20 +67,20 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                         <div className="flex items-center gap-2">
                             <div
                                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${isPast
-                                        ? 'bg-[var(--color-accent)] text-[#0F0F23]'
-                                        : isActive
-                                            ? 'bg-[var(--color-primary)] text-white'
-                                            : 'bg-[var(--color-surface-input)] text-[var(--color-text-muted)]'
+                                    ? 'bg-[var(--color-accent)] text-[#0F0F23]'
+                                    : isActive
+                                        ? 'bg-[var(--color-primary)] text-white'
+                                        : 'bg-[var(--color-surface-input)] text-[var(--color-text-muted)]'
                                     }`}
                             >
                                 {isPast ? '✓' : stepNum}
                             </div>
                             <span
                                 className={`text-sm font-medium hidden sm:inline ${isPast
-                                        ? 'text-[var(--color-accent)]'
-                                        : isActive
-                                            ? 'text-[var(--color-text-primary)]'
-                                            : 'text-[var(--color-text-muted)]'
+                                    ? 'text-[var(--color-accent)]'
+                                    : isActive
+                                        ? 'text-[var(--color-text-primary)]'
+                                        : 'text-[var(--color-text-muted)]'
                                     }`}
                             >
                                 {label}
@@ -115,6 +116,8 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
 
     const [errors, setErrors] = useState<Record<string, boolean>>({});
     const [attempted, setAttempted] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Track which sections user has scrolled past for step indicator
     const [scrollStep, setScrollStep] = useState(0);
@@ -155,8 +158,9 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         setAttempted(true);
+        setSubmitError(null);
         if (!validate()) {
             // Scroll to first error
             const firstErrorKey = Object.keys(errors)[0] || 'goal0';
@@ -164,8 +168,43 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
+
+        setSubmitting(true);
+
+        // Always save to localStorage as backup
         localStorage.setItem('onboarding', JSON.stringify(data));
-        onComplete();
+
+        try {
+            const { error } = await supabase.from('user_profiles').insert({
+                name: data.name || null,
+                timezone: data.timezone,
+                wake_time: data.wakeTime,
+                sleep_time: data.sleepTime,
+                goals: data.goals,
+                distraction: data.distraction || null,
+                work_style_micro: data.workStyle.micro,
+                work_style_deep: data.workStyle.deep,
+                quiet_hours_enabled: data.quietHours.enabled,
+                quiet_hours_start: data.quietHours.start,
+                quiet_hours_end: data.quietHours.end,
+                intensity: data.intensity,
+                permission_location: data.permissions.location,
+                permission_motion: data.permissions.motion,
+            });
+
+            if (error) {
+                console.error('Supabase error:', error);
+                setSubmitError('Saved locally. Cloud sync failed — you can retry later.');
+            }
+
+            onComplete();
+        } catch (err) {
+            console.error('Network error:', err);
+            // Still complete — data is in localStorage
+            onComplete();
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleLocationPermission = async () => {
@@ -512,11 +551,23 @@ export default function OnboardingForm({ onComplete }: { onComplete: () => void 
                 </p>
             </section>
 
+            {/* ===== ERROR TOAST ===== */}
+            {submitError && (
+                <div className="fixed top-4 left-4 right-4 z-50 max-w-lg mx-auto p-3 rounded-xl bg-[rgba(255,107,107,0.15)] border border-[var(--color-danger)] text-sm text-[var(--color-danger)] text-center animate-fade-in-up">
+                    {submitError}
+                </div>
+            )}
+
             {/* ===== STICKY CTA ===== */}
             <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-gradient-to-t from-[#0F0F23] via-[#0F0F23] to-transparent">
                 <div className="max-w-lg mx-auto">
-                    <button type="button" className="btn-primary" onClick={handleSubmit}>
-                        Finish setup
+                    <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                    >
+                        {submitting ? 'Saving…' : 'Finish setup'}
                     </button>
                 </div>
             </div>
