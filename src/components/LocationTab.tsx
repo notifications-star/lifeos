@@ -47,23 +47,6 @@ export default function LocationTab({ userId }: { userId: string }) {
                     logs={logs}
                 />
 
-                {/* Controls (kept generic outside the map provider) */}
-                <div className="map-controls" style={{ zIndex: 1000, position: 'absolute', right: 16, bottom: 80 }}>
-                    <button className="map-btn" onClick={() => {
-                        const mapElem = document.querySelector('.leaflet-container');
-                        if (mapElem && (mapElem as any)._leaflet_map) {
-                            (mapElem as any)._leaflet_map.zoomIn();
-                        }
-                    }}>＋</button>
-                    <button className="map-btn" onClick={() => {
-                        const mapElem = document.querySelector('.leaflet-container');
-                        if (mapElem && (mapElem as any)._leaflet_map) {
-                            (mapElem as any)._leaflet_map.zoomOut();
-                        }
-                    }}>－</button>
-                    <button className="map-btn">🎯</button>
-                </div>
-
                 {/* Status */}
                 <div className="map-status" style={{ zIndex: 1000, position: 'absolute', bottom: 16, left: 16, right: 16 }}>
                     <div className="map-status-icon">{getIconInfo(currentPlace?.place_type ?? null).icon}</div>
@@ -136,6 +119,27 @@ export default function LocationTab({ userId }: { userId: string }) {
 
 // ─── Map Implementations ───────────────────────────────────────────────────────
 
+import { useMap } from 'react-leaflet';
+
+/**
+ * Handles Leaflet-specific map controls internally so the main tab remains unaware of Leaflet details.
+ */
+function LeafletMapControls({ currentPlace }: any) {
+    const map = useMap();
+
+    return (
+        <div className="map-controls" style={{ zIndex: 1000, position: 'absolute', right: 16, bottom: 80 }}>
+            <button className="map-btn" onClick={() => map.zoomIn()}>＋</button>
+            <button className="map-btn" onClick={() => map.zoomOut()}>－</button>
+            <button className="map-btn" onClick={() => {
+                if (currentPlace) {
+                    map.setView([currentPlace.latitude, currentPlace.longitude], 15, { animate: true });
+                }
+            }}>🎯</button>
+        </div>
+    );
+}
+
 /**
  * Encapsulated Leaflet Map Component
  */
@@ -171,6 +175,8 @@ function LeafletMapComponent({ centerLat, centerLon, currentPlace, logs }: any) 
                     </Popup>
                 </Marker>
             )}
+
+            <LeafletMapControls currentPlace={currentPlace} />
         </MapContainer>
     );
 }
