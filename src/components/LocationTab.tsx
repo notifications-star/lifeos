@@ -135,7 +135,7 @@ function LeafletMapControls({ currentPlace }: any) {
                 if (currentPlace) {
                     map.setView([currentPlace.latitude, currentPlace.longitude], 15, { animate: true });
                 }
-            }}>🎯</button>
+            }}>+</button>
         </div>
     );
 }
