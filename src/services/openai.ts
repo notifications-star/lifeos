@@ -1,25 +1,21 @@
+import { buildAIContext } from './data';
+
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
-const SYSTEM_PROMPT = `You are "LifeOS Mom" — an AI personal execution assistant that acts like a caring, smart, slightly sarcastic mom who genuinely wants the user to succeed.
+const BASE_PROMPT = `You are "LifeOS Mom" — an AI personal execution assistant that acts like a caring, smart, slightly sarcastic mom who genuinely wants the user to succeed.
 
 Your personality:
 - Warm but real — you don't sugarcoat, but you're never mean
 - You track the user's schedule, tasks, habits, and goals
 - You give proactive nudges and help them optimize their day
-- You're aware of their location, calendar, and energy levels (when provided)
+- You're aware of their tasks, events, stats, and goals (provided below)
 - You use emojis naturally but not excessively
-- You keep responses concise — mobile-friendly, 2-4 sentences max unless they ask for detail
-- You reference specific tasks, deadlines, and context when relevant
+- Keep responses concise — mobile-friendly, 2-4 sentences max unless they ask for detail
+- Reference specific tasks, deadlines, and context when relevant
+- If they're procrastinating, call it out lovingly
+- If they finished something, celebrate enthusiastically
 
-Context about the user's current state:
-- They're a college student
-- Today's tasks: Email Prof. Martinez (overdue), CS 301 Problem Set 3 (due 11:59 PM), Reply to group project chat
-- Completed: Read Ch. 4 Algorithms
-- There's a party tonight at 7 PM (Jake's birthday)
-- Current stats: 4.2k steps, 3h 40m screen time, 6.5h sleep last night, 1/5 tasks done
-- Day score: 65/100
-
-Always be helpful, actionable, and encouraging. If they're procrastinating, call it out lovingly.`;
+Always be helpful, actionable, and encouraging.`;
 
 export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
@@ -32,13 +28,15 @@ export async function sendToAI(messages: ChatMessage[]): Promise<string> {
     }
 
     try {
-        // Build the input with system context
+        // Build dynamic context from real user data
+        const userContext = await buildAIContext();
+        const systemPrompt = `${BASE_PROMPT}\n\n--- USER'S CURRENT DATA ---\n${userContext}`;
+
         const fullMessages = [
-            { role: 'system' as const, content: SYSTEM_PROMPT },
+            { role: 'system' as const, content: systemPrompt },
             ...messages,
         ];
 
-        // Use the Responses API format
         const response = await fetch('https://api.openai.com/v1/responses', {
             method: 'POST',
             headers: {
@@ -59,8 +57,6 @@ export async function sendToAI(messages: ChatMessage[]): Promise<string> {
 
         const data = await response.json();
 
-        // Extract text from the response
-        // The Responses API returns output array with message items
         if (data.output) {
             for (const item of data.output) {
                 if (item.type === 'message' && item.content) {
@@ -73,7 +69,6 @@ export async function sendToAI(messages: ChatMessage[]): Promise<string> {
             }
         }
 
-        // Fallback: try direct text field
         if (data.output_text) return data.output_text;
 
         return "I'm here but got an unexpected response format. Try again?";
