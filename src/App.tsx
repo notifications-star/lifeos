@@ -83,7 +83,7 @@ export default function App() {
         <OnboardingForm user={user} onComplete={handleOnboardingComplete} />
       )}
 
-      {appState === 'app' && <MainApp userName={userName} onLogout={() => supabase.auth.signOut()} />}
+      {appState === 'app' && user && <MainApp userId={user.id} userName={userName} onLogout={() => supabase.auth.signOut()} />}
     </>
   );
 }

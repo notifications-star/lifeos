@@ -6,11 +6,14 @@ import TasksTab from './components/TasksTab';
 import RecapTab from './components/RecapTab';
 import BottomNav from './components/BottomNav';
 import PushNotification from './components/PushNotification';
+import { useLocationLogger } from './services/locationService';
 
-export default function MainApp({ userName, onLogout }: { userName: string; onLogout: () => void }) {
+export default function MainApp({ userId, userName, onLogout }: { userId: string; userName: string; onLogout: () => void }) {
     const [activeTab, setActiveTab] = useState('home');
     const [isDark, setIsDark] = useState(false);
     const screenRef = useRef<HTMLDivElement>(null);
+
+    useLocationLogger(userId);
 
     const toggleTheme = () => {
         const next = !isDark;
@@ -38,7 +41,7 @@ export default function MainApp({ userName, onLogout }: { userName: string; onLo
                 {activeTab === 'chat' && (
                     <ChatTab onToggleTheme={toggleTheme} isDark={isDark} />
                 )}
-                {activeTab === 'location' && <LocationTab />}
+                {activeTab === 'location' && <LocationTab userId={userId} />}
                 {activeTab === 'tasks' && <TasksTab />}
                 {activeTab === 'recap' && <RecapTab />}
             </div>

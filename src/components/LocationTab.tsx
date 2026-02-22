@@ -1,4 +1,26 @@
-export default function LocationTab() {
+import { useLocationLogs } from '../services/locationService';
+
+export default function LocationTab({ userId }: { userId: string }) {
+    const { logs, loading, permissionDenied } = useLocationLogs(userId);
+
+    const currentPlace = logs.length > 0 ? logs[logs.length - 1] : null;
+
+    // Helper to format time
+    const formatTime = (isoString: string) => {
+        return new Date(isoString).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    };
+
+    // Helper for icon based on type
+    const getIconInfo = (type: string | null) => {
+        switch (type) {
+            case 'home': return { icon: '🛏', bg: 'var(--surface2)', color: 'var(--text3)' };
+            case 'transit': return { icon: '🚌', bg: 'var(--sky)', color: 'var(--sky-text)' };
+            case 'shop': return { icon: '🛍', bg: 'var(--rose)', color: 'var(--rose-text)' };
+            case 'amenity': return { icon: '🌯', bg: 'var(--mint)', color: 'var(--mint-text)' };
+            default: return { icon: '📍', bg: 'var(--lavender)', color: 'var(--lavender-text)' };
+        }
+    };
+
     return (
         <div>
             {/* Map */}
@@ -14,25 +36,9 @@ export default function LocationTab() {
                     <path d="M 185 135 Q 220 110 255 85" stroke="#8b6fd4" strokeWidth="2.5" fill="none" strokeDasharray="4,6" opacity="0.5" />
                 </svg>
 
-                {/* Pins */}
-                <div className="map-pin" style={{ left: '21%', top: '72%' }}>
-                    <div className="pin-bubble past"><div className="pin-dot" style={{ background: '#a09888' }} />🛏 Home</div>
-                    <div className="pin-tail" style={{ background: '#a09888' }} /><div className="pin-base" style={{ background: '#a09888' }} />
-                </div>
-                <div className="map-pin" style={{ left: '47%', top: '38%' }}>
-                    <div className="pin-bubble past"><div className="pin-dot" style={{ background: '#4da6e8' }} />🎓 SFSU</div>
-                    <div className="pin-tail" style={{ background: '#4da6e8' }} /><div className="pin-base" style={{ background: '#4da6e8' }} />
-                </div>
+                {/* Simulated Pins */}
                 <div className="my-location" style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)' }}>
                     <div className="loc-ring" /><div className="loc-pulse" />
-                </div>
-                <div className="map-pin" style={{ left: '48%', top: '15%' }}>
-                    <div className="pin-bubble active"><div className="pin-dot" style={{ background: '#3dbf85' }} />🌯 Chipotle</div>
-                    <div className="pin-tail" style={{ background: '#3dbf85' }} /><div className="pin-base" style={{ background: '#3dbf85' }} />
-                </div>
-                <div className="map-pin" style={{ left: '74%', top: '5%' }}>
-                    <div className="pin-bubble" style={{ borderColor: 'var(--lavender-dark)', opacity: 0.7 }}><div className="pin-dot" style={{ background: '#8b6fd4' }} />🎉 Party</div>
-                    <div className="pin-tail" style={{ background: '#8b6fd4', opacity: 0.5 }} /><div className="pin-base" style={{ background: '#8b6fd4', opacity: 0.5 }} />
                 </div>
 
                 {/* Controls */}
@@ -44,47 +50,66 @@ export default function LocationTab() {
 
                 {/* Status */}
                 <div className="map-status">
-                    <div className="map-status-icon">🌯</div>
+                    <div className="map-status-icon">{getIconInfo(currentPlace?.place_type ?? null).icon}</div>
                     <div className="map-status-text">
-                        <div className="map-status-title">Chipotle — Mission St</div>
-                        <div className="map-status-sub">Eating lunch · HR 72 bpm · ~28 min left</div>
+                        <div className="map-status-title">{currentPlace?.place_name || 'Detecting location...'}</div>
+                        <div className="map-status-sub">{permissionDenied ? 'Waiting for permission' : 'Live tracking active'}</div>
                     </div>
                     <div className="map-status-time">Now</div>
                 </div>
             </div>
 
+            {/* Permission Denied Warning */}
+            {permissionDenied && (
+                <div style={{ padding: '0 24px', marginTop: 16 }}>
+                    <div style={{ background: 'rgba(255, 107, 107, 0.1)', border: '1px solid var(--peach)', padding: 16, borderRadius: 16 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--peach-text)', marginBottom: 4 }}>📍 Enable Location</div>
+                        <div style={{ fontSize: 13, color: 'var(--text2)' }}>Your browser is blocking location access. Please click the icon in your address bar and "Allow" to see your journey.</div>
+                    </div>
+                </div>
+            )}
+
             {/* Journey Log */}
             <div className="log-section">
                 <div className="log-title">Today's Journey</div>
 
-                <JourneyItem icon="🛏" iconBg="var(--surface2)" place="Home" addr="2847 Sunset Blvd, SF"
-                    time="7:00 – 8:45 AM" dur="1h 45m" durBg="var(--surface2)" durColor="var(--text3)"
-                    activities={[{ label: '😴 Woke up', bg: 'var(--mint)', color: 'var(--mint-text)' }, { label: '☕ Morning', bg: 'var(--butter)', color: 'var(--butter-text)' }]} />
+                {loading && !logs.length && (
+                    <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>
+                        Loading journey...
+                    </div>
+                )}
 
-                <JourneyItem icon="🚌" iconBg="var(--sky)" place="Transit · MUNI Bus" addr="Sunset → SFSU"
-                    time="8:45 – 9:00 AM" dur="15m" durBg="var(--sky)" durColor="var(--sky-text)"
-                    activities={[{ label: '🎵 Listening', bg: 'var(--lavender)', color: 'var(--lavender-text)' }]} />
+                {!loading && !logs.length && !permissionDenied && (
+                    <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>
+                        No logs yet today. Move around to start logging!
+                    </div>
+                )}
 
-                <JourneyItem icon="🎓" iconBg="var(--sky)" place="SFSU — Lecture Hall C" addr="1600 Holloway Ave, SF"
-                    time="9:00 – 11:30 AM" dur="2h 30m" durBg="var(--sky)" durColor="var(--sky-text)"
-                    activities={[{ label: '📖 Class', bg: 'var(--sky)', color: 'var(--sky-text)' }, { label: '✏️ Studying', bg: 'var(--mint)', color: 'var(--mint-text)' }]} />
+                {logs.map((log, index) => {
+                    const info = getIconInfo(log.place_type);
+                    const isLast = index === logs.length - 1;
+                    return (
+                        <JourneyItem
+                            key={log.id}
+                            icon={info.icon}
+                            iconBg={info.bg}
+                            place={log.place_name || `Point ${index + 1}`}
+                            addr={`${log.latitude.toFixed(4)}, ${log.longitude.toFixed(4)}`}
+                            time={formatTime(log.logged_at)}
+                            dur={isLast ? 'Now' : 'Logged'}
+                            durBg={info.bg}
+                            durColor={info.color}
+                            isCurrent={isLast}
+                        />
+                    );
+                })}
 
-                <JourneyItem icon="🚇" iconBg="var(--surface2)" place="Transit · BART" addr="Glen Park → 24th St Mission"
-                    time="11:45 AM – 12:20 PM" dur="35m" durBg="var(--surface2)" durColor="var(--text3)"
-                    activities={[{ label: '🎵 Music', bg: 'var(--lavender)', color: 'var(--lavender-text)' }, { label: '📵 IG 18m', bg: 'var(--peach)', color: 'var(--peach-text)' }]} />
-
-                <JourneyItem icon="🌯" iconBg="var(--mint)" isCurrent place="Chipotle — Mission St ● Now" addr="2945 Mission St, SF"
-                    time="12:30 PM – ongoing" dur="~25m" durBg="var(--mint)" durColor="var(--mint-text)"
-                    activities={[{ label: '🍽 Eating', bg: 'var(--mint)', color: 'var(--mint-text)' }, { label: '🎵 AirPods', bg: 'var(--lavender)', color: 'var(--lavender-text)' }]}
-                    placeColor="var(--mint-dark)" />
-
-                <JourneyItem icon="📚" iconBg="var(--lavender)" predicted place="📍 Predicted: Library (Study)" addr="CS 301 homework block · 4–6 PM"
-                    time="~4:00 PM" dur="2h" durBg="var(--lavender)" durColor="var(--lavender-text)"
-                    placeColor="var(--lavender-dark)" />
-
-                <JourneyItem icon="🎉" iconBg="var(--rose)" predicted place="🎉 Jake's Birthday Party" addr="2847 Valencia St · Unexpected event"
-                    time="~7:00 PM" dur="Late night" durBg="var(--rose)" durColor="var(--rose-text)"
-                    placeColor="var(--rose-dark)" borderColor="var(--rose-dark)" isLast />
+                {/* Placeholder predicted event at the end */}
+                {!loading && logs.length > 0 && (
+                    <JourneyItem icon="🎉" iconBg="var(--rose)" predicted place="🎉 Jake's Party" addr="Predicted based on calendar"
+                        time="~7:00 PM" dur="Tonight" durBg="var(--rose)" durColor="var(--rose-text)"
+                        placeColor="var(--rose-dark)" borderColor="var(--rose-dark)" isLast />
+                )}
             </div>
 
             <div className="bottom-space" />

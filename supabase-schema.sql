@@ -134,3 +134,32 @@ CREATE INDEX idx_events_user ON events(user_id, event_date);
 CREATE INDEX idx_logs_user ON daily_logs(user_id, log_date);
 CREATE INDEX idx_goals_user ON goals(user_id, active);
 CREATE INDEX idx_chat_user ON chat_messages(user_id, created_at);
+
+-- ═══════════════════════════════════════════
+-- LOCATION LOGS
+-- ═══════════════════════════════════════════
+CREATE TABLE location_logs (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  logged_at     TIMESTAMPTZ DEFAULT now() NOT NULL,
+  latitude      DOUBLE PRECISION NOT NULL,
+  longitude     DOUBLE PRECISION NOT NULL,
+  accuracy      REAL,
+  place_name    TEXT,
+  place_type    TEXT
+);
+
+ALTER TABLE location_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert own logs"
+  ON location_logs FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can read own logs"
+  ON location_logs FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own logs"
+  ON location_logs FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
