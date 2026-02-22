@@ -1,66 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
+import { sendToAI, type ChatMessage } from '../services/openai';
+import { supabase } from '../supabaseClient';
 
-interface Message {
+interface DisplayMessage {
     id: string;
-    type: 'ai' | 'user' | 'notif';
+    type: 'ai' | 'user';
     text: string;
     time: string;
-    quickReplies?: { label: string; replyId: string }[];
 }
-
-function generateReply(text: string): string {
-    const t = text.toLowerCase();
-    if (t.includes('gym') || t.includes('workout'))
-        return "I moved your gym session to tomorrow 8 AM since you've got the party tonight. Still want to keep that? I can find another time slot 🏋️";
-    if (t.includes('done') || t.includes('finished') || t.includes('submitted'))
-        return "Amazing!! 🎉 If you submitted, I'll check Canvas in 5 min. Your day score is going up for sure — you're crushing it!";
-    if (t.includes('tired') || t.includes('sleep'))
-        return "I get it. Sleep is important too — I'll note that and factor it in. Tomorrow's 8 AM class still needs you though. Try to be home by midnight 🌙";
-    if (t.includes('help') || t.includes('stuck'))
-        return "Tell me what you're stuck on — I can pull up your Canvas notes, find your prof's office hours, or remind you of the question details from last session 📚";
-    if (t.includes('battery') || t.includes('charge'))
-        return "Yes!! Charge NOW before you leave 🔌 At 18%, you'll be dead by 9 PM without it. Maps, Uber, photos — all gone. Plug in! 🪫";
-    return "Got it, I'm logging that and adjusting your schedule if needed. Is there anything else I should know about today? 📝";
-}
-
-const INITIAL_REPLIES: Record<string, { user: string; ai: string }> = {
-    reply1: {
-        user: "I'm leaving soon, plan to finish it when I get home around 10 PM. I still have time.",
-        ai: "Got it! That tracks — 10 PM to midnight is 2 hours, which is about how long Problem Set 3 usually takes you. 📊\n\nA few things to set you up:\n• I'll remind you at 10:05 PM to open your laptop\n• Canvas is already open on your last session\n• Leave the party by 9:45 PM to have buffer time\n\nGo enjoy it — I'll handle the rest 🎉",
-    },
-    reply2: {
-        user: "I actually finished it this afternoon before the party! Submitted at like 5:30 PM.",
-        ai: "WAIT — you did?! 🎉🎉🎉 I don't see it in Canvas yet but it might be syncing.\n\nThat's huge — you knocked it out before the party like a pro. I'm updating your day score right now.\n\nDay Score: 65 → 88 🚀\n\nEnjoy the party! You earned it. 🥳",
-    },
-    reply3: {
-        user: "Look, I know I was supposed to do it at 4-6 but my friend needed help moving and it took longer than expected. I'm going to leave by 10 and finish it tonight, I promise.",
-        ai: "That makes total sense — helping a friend is important too! I'm logging that so I learn your patterns better. 📝\n\nHere's your plan:\n🚶 Leave at 10 PM sharp\n🚇 BART home = ~25 min\n💻 Start homework by 10:30 PM\n⏰ Deadline: 11:59 PM = 1h 29m to finish\n\nThat's tight but doable. Want me to set a \"leave now\" alarm at 9:58 PM? 🔔",
-    },
-};
 
 export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () => void; isDark: boolean }) {
-    const [messages, setMessages] = useState<Message[]>([
+    const [messages, setMessages] = useState<DisplayMessage[]>([
         {
-            id: 'notif-1',
-            type: 'notif',
-            text: '',
-            time: '9:18 PM',
-        },
-        {
-            id: 'ai-1',
+            id: 'ai-welcome',
             type: 'ai',
-            text: "Hey Alex 👀 I noticed you're at Jake's party right now — totally fun, you deserve it! But CS 301 is due at <strong>11:59 PM</strong> and it's already 9:18 PM.\n\nDid something come up, or are you planning to finish it later tonight?",
-            time: '9:18 PM',
-            quickReplies: [
-                { label: "I'm leaving soon 👋", replyId: 'reply1' },
-                { label: 'I already finished it!', replyId: 'reply2' },
-                { label: 'Explain myself...', replyId: 'reply3' },
-            ],
+            text: "Hey! 👀 I'm your LifeOS Mom — I track your schedule, tasks, and habits so you don't have to. Ask me anything about your day, or let me help you stay on track. What's up?",
+            time: formatTime(),
         },
     ]);
     const [input, setInput] = useState('');
     const [typing, setTyping] = useState(false);
-    const [usedReplies, setUsedReplies] = useState<Set<string>>(new Set());
+    const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -69,35 +29,86 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
 
     useEffect(scrollToBottom, [messages, typing]);
 
-    const handleQuickReply = (replyId: string) => {
-        if (usedReplies.has(replyId)) return;
-        setUsedReplies((prev) => new Set(prev).add(replyId));
+    // Load chat history from Supabase on mount
+    useEffect(() => {
+        loadChatHistory();
+    }, []);
 
-        const reply = INITIAL_REPLIES[replyId];
-        if (!reply) return;
+    async function loadChatHistory() {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) return;
 
-        setMessages((prev) => [...prev, { id: `user-${replyId}`, type: 'user', text: reply.user, time: '9:19 PM' }]);
+            const { data } = await supabase
+                .from('chat_messages')
+                .select('role, content, created_at')
+                .eq('user_id', session.user.id)
+                .order('created_at', { ascending: true })
+                .limit(50);
 
-        setTyping(true);
-        setTimeout(() => {
-            setTyping(false);
-            setMessages((prev) => [...prev, { id: `ai-${replyId}`, type: 'ai', text: reply.ai, time: '9:20 PM' }]);
-        }, 900);
-    };
+            if (data && data.length > 0) {
+                const history: ChatMessage[] = [];
+                const display: DisplayMessage[] = [];
 
-    const handleSend = () => {
+                for (const msg of data) {
+                    history.push({ role: msg.role, content: msg.content });
+                    display.push({
+                        id: `db-${msg.created_at}`,
+                        type: msg.role === 'user' ? 'user' : 'ai',
+                        text: msg.content,
+                        time: new Date(msg.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                    });
+                }
+
+                setConversationHistory(history);
+                setMessages(display);
+            }
+        } catch (err) {
+            console.log('No chat history loaded:', err);
+        }
+    }
+
+    async function saveToDB(role: 'user' | 'assistant', content: string) {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) return;
+
+            await supabase.from('chat_messages').insert({
+                user_id: session.user.id,
+                role,
+                content,
+            });
+        } catch (err) {
+            console.log('Failed to save message:', err);
+        }
+    }
+
+    const handleSend = async () => {
         const text = input.trim();
-        if (!text) return;
+        if (!text || typing) return;
         setInput('');
 
-        setMessages((prev) => [...prev, { id: `user-${Date.now()}`, type: 'user', text, time: 'just now' }]);
+        const userMsg: DisplayMessage = { id: `user-${Date.now()}`, type: 'user', text, time: formatTime() };
+        setMessages((prev) => [...prev, userMsg]);
 
+        const updatedHistory: ChatMessage[] = [...conversationHistory, { role: 'user', content: text }];
+        setConversationHistory(updatedHistory);
+
+        // Save user message to DB
+        saveToDB('user', text);
+
+        // Call AI
         setTyping(true);
-        setTimeout(() => {
-            setTyping(false);
-            const reply = generateReply(text);
-            setMessages((prev) => [...prev, { id: `ai-${Date.now()}`, type: 'ai', text: reply, time: 'just now' }]);
-        }, 1200);
+        const aiResponse = await sendToAI(updatedHistory);
+        setTyping(false);
+
+        const aiMsg: DisplayMessage = { id: `ai-${Date.now()}`, type: 'ai', text: aiResponse, time: formatTime() };
+        setMessages((prev) => [...prev, aiMsg]);
+
+        setConversationHistory((prev) => [...prev, { role: 'assistant', content: aiResponse }]);
+
+        // Save AI response to DB
+        saveToDB('assistant', aiResponse);
     };
 
     return (
@@ -107,40 +118,19 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
                 <div className="chat-avatar">🤖</div>
                 <div className="chat-info">
                     <div className="chat-name">LifeOS Mom</div>
-                    <div className="chat-status">● Always watching · Always caring</div>
+                    <div className="chat-status">● Powered by GPT-5 Nano</div>
                 </div>
                 <div className="theme-toggle" onClick={onToggleTheme}>{isDark ? '☀️' : '🌙'}</div>
             </div>
 
             {/* Messages */}
             <div className="chat-messages">
-                {messages.map((msg) => {
-                    if (msg.type === 'notif') {
-                        return (
-                            <div key={msg.id} className="chat-notif-push">
-                                <div className="cnp-label">📍 Location Alert · 9:18 PM</div>
-                                <div className="cnp-title">You're at a party — CS 301 is due in 2h 41m.</div>
-                                <div className="cnp-body">I can see you're at 2847 Valencia St (Jake's place). Your assignment is due at 11:59 PM. You planned to finish it at 4–6 PM but that window passed. What happened?</div>
-                            </div>
-                        );
-                    }
-
-                    return (
-                        <div key={msg.id} className={`msg ${msg.type}`}>
-                            <div className="msg-bubble" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br/>') }} />
-                            <div className="msg-time">{msg.time}</div>
-                            {msg.quickReplies && !usedReplies.has(msg.quickReplies[0]?.replyId) && (
-                                <div className="msg-quick-replies">
-                                    {msg.quickReplies.map((qr) => (
-                                        <div key={qr.replyId} className="quick-reply" onClick={() => handleQuickReply(qr.replyId)}>
-                                            {qr.label}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                {messages.map((msg) => (
+                    <div key={msg.id} className={`msg ${msg.type}`}>
+                        <div className="msg-bubble" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                        <div className="msg-time">{msg.time}</div>
+                    </div>
+                ))}
 
                 {typing && (
                     <div className="msg ai">
@@ -159,9 +149,14 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    disabled={typing}
                 />
-                <button className="chat-send" onClick={handleSend}>↑</button>
+                <button className="chat-send" onClick={handleSend} disabled={typing}>↑</button>
             </div>
         </div>
     );
+}
+
+function formatTime(): string {
+    return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
