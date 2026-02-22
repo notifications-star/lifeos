@@ -182,7 +182,7 @@ function LeafletMapComponent({ centerLat, centerLon, currentPlace, logs }: any) 
 }
 
 /**
- * 🚀 FUTURE PROOFING: SWAPPING MAP UI PROVIDERS
+ * FUTURE PROOFING: SWAPPING MAP UI PROVIDERS
  * 
  * To switch to a paid map like Apple MapKit JS or Google Maps SDK:
  * 
