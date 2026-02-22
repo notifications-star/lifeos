@@ -2,598 +2,468 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import type { User } from '@supabase/supabase-js';
 
-// ---------- Types ----------
-interface OnboardingData {
-    name: string;
-    timezone: string;
-    wakeTime: string;
-    sleepTime: string;
-    goals: [string, string, string];
-    distraction: string;
-    workStyle: { micro: boolean; deep: boolean };
-    quietHours: { enabled: boolean; start: string; end: string };
-    intensity: 'gentle' | 'normal' | 'strict';
-    permissions: { location: boolean; motion: boolean };
+// =============================================
+// AGE-BASED CONTENT DATA
+// =============================================
+
+interface AgeInsights {
+    label: string;
+    avgDay: string[];
+    doThis: string[];
+    avoidThis: string[];
+    suggestedGoals: string[];
+    questions: { key: string; label: string; placeholder: string }[];
 }
 
-// ---------- Helpers ----------
-function detectTimezone(): string {
-    try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch {
-        return 'UTC';
-    }
-}
+const AGE_BRACKETS: Record<string, AgeInsights> = {
+    '13-17': {
+        label: '13–17 · Student',
+        avgDay: [
+            '6–8 hrs school + homework',
+            '2–4 hrs screens & social media',
+            '1–2 hrs socializing',
+            '~30 min physical activity (avg)',
+        ],
+        doThis: [
+            'Build a reading habit early — even 20 min/day compounds',
+            'Try one extracurricular deeply, not five shallowly',
+            'Sleep 8–9 hours — your brain is still developing',
+            'Learn one real skill: coding, design, writing, or music',
+        ],
+        avoidThis: [
+            'Doom-scrolling TikTok/Instagram before bed',
+            'Comparing yourself to highlights online',
+            'Skipping meals or sleep for screen time',
+            'Procrastinating homework until midnight',
+        ],
+        suggestedGoals: [
+            'Read 1 book per month',
+            'Build a portfolio project',
+            'Exercise 3x per week',
+            'Limit social media to 1 hr/day',
+            'Learn a new skill',
+        ],
+        questions: [
+            { key: 'occupation', label: 'What are you focused on?', placeholder: 'e.g. High school, SAT prep, sports' },
+            { key: 'biggestChallenge', label: 'Biggest daily challenge?', placeholder: 'e.g. Focus, procrastination, sleep' },
+        ],
+    },
+    '18-24': {
+        label: '18–24 · Early Career / College',
+        avgDay: [
+            '4–8 hrs work or classes',
+            '3–5 hrs screens (non-work)',
+            '~1 hr commute or transit',
+            '6.5 hrs sleep (below optimal)',
+        ],
+        doThis: [
+            'Ship projects — finished > perfect',
+            'Network by helping, not asking',
+            'Invest in skills that compound: writing, speaking, coding',
+            'Start saving/investing even $50/month — habit matters more than amount',
+        ],
+        avoidThis: [
+            'Tutorial hell — build things instead',
+            'Spending to impress people you don\'t like',
+            'Saying yes to everything — protect your time',
+            'Neglecting physical health for hustle culture',
+        ],
+        suggestedGoals: [
+            'Ship 1 project this month',
+            'Read 2 books per month',
+            'Save or invest consistently',
+            'Build a morning routine',
+            'Exercise 4x per week',
+            'Reduce screen time to 2 hrs/day',
+        ],
+        questions: [
+            { key: 'occupation', label: 'What do you do?', placeholder: 'e.g. College student, junior dev, freelancer' },
+            { key: 'biggestChallenge', label: 'What holds you back most?', placeholder: 'e.g. Discipline, direction, anxiety' },
+            { key: 'income', label: 'Do you have income to manage?', placeholder: 'e.g. Part-time, full-time, none yet' },
+        ],
+    },
+    '25-34': {
+        label: '25–34 · Career Building',
+        avgDay: [
+            '8–10 hrs work + commute',
+            '2–3 hrs screens (non-work)',
+            '1–2 hrs chores & errands',
+            '6.8 hrs sleep (avg)',
+        ],
+        doThis: [
+            'Go deep in one domain — become the expert',
+            'Automate finances: bills, savings, investing',
+            'Protect 2 hrs of deep work daily — no meetings, no Slack',
+            'Build relationships that outlast any job',
+        ],
+        avoidThis: [
+            'Lifestyle creep — keep expenses flat as income grows',
+            'Working 70-hr weeks thinking it\'ll pay off later',
+            'Ignoring health — it gets harder every year after 30',
+            'Social media comparison to curated highlight reels',
+        ],
+        suggestedGoals: [
+            'Reach next career milestone',
+            'Build an emergency fund',
+            'Exercise 4–5x per week',
+            'Deep work 2 hrs every day',
+            'One weekend hobby that isn\'t screens',
+            'Read / learn 30 min daily',
+        ],
+        questions: [
+            { key: 'occupation', label: 'What\'s your role?', placeholder: 'e.g. Product manager, engineer, entrepreneur' },
+            { key: 'biggestChallenge', label: 'What feels most overwhelming?', placeholder: 'e.g. Work-life balance, burnout, finances' },
+            { key: 'hasFamily', label: 'Family situation?', placeholder: 'e.g. Single, partner, kids' },
+        ],
+    },
+    '35-44': {
+        label: '35–44 · Peak Career / Family',
+        avgDay: [
+            '8–9 hrs work',
+            '2–3 hrs family / kids',
+            '1–2 hrs chores & logistics',
+            '6.5 hrs sleep (often less)',
+        ],
+        doThis: [
+            'Delegate — your time is worth more than your ego',
+            'Invest in health NOW — the ROI is massive after 35',
+            'Schedule family time like you schedule meetings',
+            'Say no to 90% of things that aren\'t core priorities',
+        ],
+        avoidThis: [
+            'Being "busy" but not productive',
+            'Neglecting relationships for career',
+            'Skipping annual health checkups',
+            'Taking on debt for lifestyle upgrades',
+        ],
+        suggestedGoals: [
+            'Protect daily exercise (even 30 min)',
+            'Plan family time weekly',
+            'Build passive income streams',
+            'Sleep 7+ hours consistently',
+            'Annual health checkup',
+            'Learn to say no',
+        ],
+        questions: [
+            { key: 'occupation', label: 'What\'s your work?', placeholder: 'e.g. Manager, founder, consultant' },
+            { key: 'biggestChallenge', label: 'What\'s your biggest constraint?', placeholder: 'e.g. Time with family, energy, stress' },
+        ],
+    },
+    '45+': {
+        label: '45+ · Wisdom Phase',
+        avgDay: [
+            '7–9 hrs work (often flexible)',
+            '2–3 hrs family / community',
+            '1–2 hrs health & wellness',
+            '6–7 hrs sleep',
+        ],
+        doThis: [
+            'Mentor someone younger — it compounds for both of you',
+            'Prioritize flexibility and mobility training',
+            'Invest in experiences over things',
+            'Build systems that run without you',
+        ],
+        avoidThis: [
+            'Ignoring signs of burnout — recovery takes longer now',
+            'Being resistant to new technology and methods',
+            'Isolation — stay socially connected',
+            'Putting off health investments',
+        ],
+        suggestedGoals: [
+            'Daily movement / flexibility routine',
+            'Mentor 1 person',
+            'Plan a meaningful experience monthly',
+            'Strengthen key relationships',
+            'Regular health optimization',
+            'Learn something new each quarter',
+        ],
+        questions: [
+            { key: 'occupation', label: 'How do you spend your days?', placeholder: 'e.g. Executive, consultant, semi-retired' },
+            { key: 'biggestChallenge', label: 'What would you like to improve?', placeholder: 'e.g. Health, relationships, purpose' },
+        ],
+    },
+};
 
-const COMMON_TIMEZONES = [
-    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-    'America/Anchorage', 'Pacific/Honolulu', 'America/Phoenix',
-    'America/Toronto', 'America/Vancouver', 'America/Mexico_City',
-    'America/Sao_Paulo', 'America/Buenos_Aires', 'America/Bogota',
-    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid',
-    'Europe/Rome', 'Europe/Amsterdam', 'Europe/Moscow',
-    'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Jakarta', 'Asia/Singapore',
-    'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Hong_Kong',
-    'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland',
-    'Africa/Lagos', 'Africa/Cairo', 'Africa/Johannesburg',
-    'UTC',
-];
+const AGE_OPTIONS = Object.keys(AGE_BRACKETS);
 
-const STEP_TITLES = ['Profile', 'Goals', 'Preferences'];
+// =============================================
+// COMPONENT
+// =============================================
 
-// ---------- Toggle ----------
-function Toggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
-    return (
-        <button
-            type="button"
-            className={`toggle-track ${active ? 'active' : ''}`}
-            onClick={onToggle}
-            aria-pressed={active}
-        >
-            <span className="toggle-thumb" />
-        </button>
-    );
-}
-
-// ---------- Step Indicator ----------
-function StepIndicator({ step }: { step: number }) {
-    return (
-        <div className="flex items-center justify-center gap-2 mb-8">
-            {STEP_TITLES.map((label, i) => {
-                const isComplete = i < step;
-                const isCurrent = i === step;
-                return (
-                    <div key={label} className="flex items-center gap-2">
-                        <div className="flex items-center gap-2">
-                            <div
-                                className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-500 ${isComplete
-                                    ? 'bg-[var(--color-accent)] text-[#0F0F23] scale-90'
-                                    : isCurrent
-                                        ? 'bg-[var(--color-primary)] text-white ring-4 ring-[rgba(108,92,231,0.25)]'
-                                        : 'bg-[var(--color-surface-input)] text-[var(--color-text-muted)]'
-                                    }`}
-                            >
-                                {isComplete ? '✓' : i + 1}
-                            </div>
-                            <span
-                                className={`text-sm font-medium hidden sm:inline transition-colors duration-300 ${isComplete
-                                    ? 'text-[var(--color-accent)]'
-                                    : isCurrent
-                                        ? 'text-[var(--color-text-primary)]'
-                                        : 'text-[var(--color-text-muted)]'
-                                    }`}
-                            >
-                                {label}
-                            </span>
-                        </div>
-                        {i < STEP_TITLES.length - 1 && (
-                            <div
-                                className={`w-8 sm:w-14 h-0.5 rounded transition-all duration-500 ${isComplete ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-surface-input)]'
-                                    }`}
-                            />
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-// ---------- Progress Bar ----------
-function ProgressBar({ step }: { step: number }) {
-    const progress = ((step + 1) / 3) * 100;
-    return (
-        <div className="w-full h-1 bg-[var(--color-surface-input)] rounded-full mb-6 overflow-hidden">
-            <div
-                className="h-full rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] transition-all duration-700 ease-out"
-                style={{ width: `${progress}%` }}
-            />
-        </div>
-    );
-}
-
-// ---------- Main Component ----------
 export default function OnboardingForm({ user, onComplete }: { user: User; onComplete: () => void }) {
-    const [step, setStep] = useState(0);
-    const [data, setData] = useState<OnboardingData>({
-        name: '',
-        timezone: detectTimezone(),
-        wakeTime: '07:00',
-        sleepTime: '23:00',
-        goals: ['', '', ''],
-        distraction: '',
-        workStyle: { micro: false, deep: false },
-        quietHours: { enabled: true, start: '23:00', end: '07:00' },
-        intensity: 'normal',
-        permissions: { location: false, motion: false },
-    });
-
-    const [errors, setErrors] = useState<Record<string, boolean>>({});
+    const [step, setStep] = useState(0); // 0=age, 1=questions, 2=insights
+    const [age, setAge] = useState<string | null>(null);
+    const [name, setName] = useState('');
+    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+    const [customGoal, setCustomGoal] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
-    const [direction, setDirection] = useState<'forward' | 'back'>('forward');
-
-    // Animate on step change
     const [animating, setAnimating] = useState(false);
+
     useEffect(() => {
         setAnimating(true);
         const t = setTimeout(() => setAnimating(false), 50);
         return () => clearTimeout(t);
     }, [step]);
 
-    const updateGoal = (index: number, value: string) => {
-        const newGoals = [...data.goals] as [string, string, string];
-        newGoals[index] = value;
-        setData({ ...data, goals: newGoals });
-        setErrors((prev) => ({ ...prev, [`goal${index}`]: false }));
-    };
-
-    const validateStep = (s: number): boolean => {
-        const newErrors: Record<string, boolean> = {};
-        if (s === 0) {
-            if (!data.wakeTime) newErrors.wakeTime = true;
-            if (!data.sleepTime) newErrors.sleepTime = true;
-        } else if (s === 1) {
-            data.goals.forEach((g, i) => {
-                if (!g.trim()) newErrors[`goal${i}`] = true;
-            });
-        }
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+    const insights = age ? AGE_BRACKETS[age] : null;
 
     const goNext = () => {
-        if (!validateStep(step)) return;
-        setDirection('forward');
         setStep((s) => Math.min(s + 1, 2));
     };
 
     const goBack = () => {
-        setDirection('back');
         setStep((s) => Math.max(s - 1, 0));
     };
 
+    const toggleGoal = (goal: string) => {
+        setSelectedGoals((prev) =>
+            prev.includes(goal) ? prev.filter((g) => g !== goal) : [...prev, goal]
+        );
+    };
+
     const handleSubmit = async () => {
-        if (!validateStep(step)) return;
-        setSubmitError(null);
         setSubmitting(true);
+        const payload = {
+            user_id: user.id,
+            email: user.email,
+            name: name || null,
+            age_bracket: age,
+            answers,
+            selected_goals: customGoal.trim()
+                ? [...selectedGoals, customGoal.trim()]
+                : selectedGoals,
+            onboarding_complete: true,
+        };
 
-        localStorage.setItem('onboarding', JSON.stringify(data));
+        localStorage.setItem('onboarding', JSON.stringify(payload));
 
         try {
-            const { error } = await supabase.from('user_profiles').insert({
-                user_id: user.id,
-                email: user.email,
-                name: data.name || null,
-                timezone: data.timezone,
-                wake_time: data.wakeTime,
-                sleep_time: data.sleepTime,
-                goals: data.goals,
-                distraction: data.distraction || null,
-                work_style_micro: data.workStyle.micro,
-                work_style_deep: data.workStyle.deep,
-                quiet_hours_enabled: data.quietHours.enabled,
-                quiet_hours_start: data.quietHours.start,
-                quiet_hours_end: data.quietHours.end,
-                intensity: data.intensity,
-                permission_location: data.permissions.location,
-                permission_motion: data.permissions.motion,
-                onboarding_complete: true,
-            });
-
-            if (error) {
-                console.error('Supabase error:', error);
-                setSubmitError('Could not save to cloud. Data saved locally.');
-            }
-
-            onComplete();
+            await supabase.from('user_profiles').insert(payload);
         } catch (err) {
-            console.error('Network error:', err);
-            onComplete();
-        } finally {
-            setSubmitting(false);
+            console.error('Save error:', err);
         }
+
+        setSubmitting(false);
+        onComplete();
     };
 
-    const handleLocationPermission = async () => {
-        try {
-            if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    () => setData({ ...data, permissions: { ...data.permissions, location: true } }),
-                    () => setData({ ...data, permissions: { ...data.permissions, location: false } })
-                );
-            }
-        } catch {
-            // Permission denied or unavailable
-        }
-    };
+    const stepAnim = animating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0';
 
-    const stepAnimClass = animating
-        ? 'opacity-0 translate-y-4'
-        : 'opacity-100 translate-y-0';
+    const progress = ((step + 1) / 3) * 100;
 
     return (
         <div className="relative z-10 w-full max-w-lg mx-auto px-4 pt-8 pb-32 min-h-dvh">
             {/* Header */}
-            <div className="text-center mb-4 animate-fade-in-up">
+            <div className="text-center mb-6 animate-fade-in-up">
                 <h1 className="text-2xl font-bold mb-1 bg-gradient-to-r from-[var(--color-primary-light)] to-[var(--color-accent)] bg-clip-text text-transparent">
-                    Let's set you up
+                    {step === 0 ? 'Tell us about you' : step === 1 ? 'A few quick questions' : 'Your personalized insights'}
                 </h1>
                 <p className="text-[var(--color-text-muted)] text-sm">
-                    Step {step + 1} of 3 — {STEP_TITLES[step]}
+                    {step === 0 ? 'Just the basics — takes 30 seconds' : step === 1 ? 'Helps us tailor suggestions' : 'Based on your age & lifestyle'}
                 </p>
             </div>
 
-            <StepIndicator step={step} />
-            <ProgressBar step={step} />
+            {/* Progress */}
+            <div className="w-full h-1 bg-[var(--color-surface-input)] rounded-full mb-8 overflow-hidden">
+                <div
+                    className="h-full rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] transition-all duration-700 ease-out"
+                    style={{ width: `${progress}%` }}
+                />
+            </div>
 
             {/* Step Content */}
-            <div
-                className={`transition-all duration-400 ease-out ${stepAnimClass}`}
-                style={{
-                    transitionProperty: 'opacity, transform',
-                }}
-                key={step}
-            >
-                {/* ===== STEP 1: PROFILE ===== */}
+            <div className={`transition-all duration-400 ease-out ${stepAnim}`} key={step}>
+
+                {/* ===== STEP 0: AGE ===== */}
                 {step === 0 && (
-                    <div className="card-glass p-6">
-                        <div className="flex items-center gap-2 mb-5">
-                            <span className="text-lg">👤</span>
-                            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Profile</h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* Email (from auth, read-only) */}
-                            <div>
-                                <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                    Email
-                                </label>
-                                <input
-                                    type="email"
-                                    className="input-field opacity-60"
-                                    value={user.email || ''}
-                                    disabled
-                                />
-                            </div>
-
-                            {/* Name */}
-                            <div>
-                                <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                    Name <span className="text-[var(--color-text-muted)]">(optional)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    placeholder="How should we call you?"
-                                    value={data.name}
-                                    onChange={(e) => setData({ ...data, name: e.target.value })}
-                                />
-                            </div>
-
-                            {/* Timezone */}
-                            <div>
-                                <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                    Timezone
-                                </label>
-                                <select
-                                    className="input-field appearance-none"
-                                    value={data.timezone}
-                                    onChange={(e) => setData({ ...data, timezone: e.target.value })}
-                                    style={{
-                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237878A0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-                                        backgroundRepeat: 'no-repeat',
-                                        backgroundPosition: 'right 16px center',
-                                    }}
-                                >
-                                    {COMMON_TIMEZONES.map((tz) => (
-                                        <option key={tz} value={tz}>
-                                            {tz.replace(/_/g, ' ')}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Wake / Sleep */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                        Wake time <span className="text-[var(--color-danger)]">*</span>
-                                    </label>
-                                    <input
-                                        id="field-wakeTime"
-                                        type="time"
-                                        className={`input-field ${errors.wakeTime ? 'error' : ''}`}
-                                        value={data.wakeTime}
-                                        onChange={(e) => {
-                                            setData({ ...data, wakeTime: e.target.value });
-                                            setErrors((prev) => ({ ...prev, wakeTime: false }));
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                        Sleep time <span className="text-[var(--color-danger)]">*</span>
-                                    </label>
-                                    <input
-                                        id="field-sleepTime"
-                                        type="time"
-                                        className={`input-field ${errors.sleepTime ? 'error' : ''}`}
-                                        value={data.sleepTime}
-                                        onChange={(e) => {
-                                            setData({ ...data, sleepTime: e.target.value });
-                                            setErrors((prev) => ({ ...prev, sleepTime: false }));
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ===== STEP 2: GOALS ===== */}
-                {step === 1 && (
-                    <div className="card-glass p-6">
-                        <div className="flex items-center gap-2 mb-5">
-                            <span className="text-lg">🎯</span>
-                            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Goals</h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                    Top 3 goals right now <span className="text-[var(--color-danger)]">*</span>
-                                </label>
-                                {[0, 1, 2].map((i) => (
-                                    <input
-                                        key={i}
-                                        id={`field-goal${i}`}
-                                        type="text"
-                                        className={`input-field mb-2.5 ${errors[`goal${i}`] ? 'error' : ''}`}
-                                        placeholder={
-                                            i === 0
-                                                ? 'e.g. Ship my side project'
-                                                : i === 1
-                                                    ? 'e.g. Exercise 3x a week'
-                                                    : 'e.g. Read 2 books this month'
-                                        }
-                                        value={data.goals[i]}
-                                        onChange={(e) => updateGoal(i, e.target.value)}
-                                    />
-                                ))}
-                            </div>
-
-                            <div>
-                                <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
-                                    One thing you want to stop wasting time on
-                                </label>
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    placeholder="e.g. Instagram, YouTube, scrolling"
-                                    value={data.distraction}
-                                    onChange={(e) => setData({ ...data, distraction: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ===== STEP 3: PREFERENCES + CONNECT LATER ===== */}
-                {step === 2 && (
                     <div className="space-y-4">
                         <div className="card-glass p-6">
-                            <div className="flex items-center gap-2 mb-5">
-                                <span className="text-lg">⚙️</span>
-                                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Preferences</h2>
-                            </div>
-
-                            <div className="space-y-6">
-                                {/* Work style */}
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-2">
-                                        Work style
+                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
+                                        Name <span className="text-[var(--color-text-muted)]">(optional)</span>
                                     </label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            className={`chip flex-1 text-center ${data.workStyle.micro ? 'selected' : ''}`}
-                                            onClick={() =>
-                                                setData({ ...data, workStyle: { ...data.workStyle, micro: !data.workStyle.micro } })
-                                            }
-                                        >
-                                            ⚡ Micro tasks
-                                            <span className="block text-xs mt-0.5 opacity-60">5–15 min</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`chip flex-1 text-center ${data.workStyle.deep ? 'selected' : ''}`}
-                                            onClick={() =>
-                                                setData({ ...data, workStyle: { ...data.workStyle, deep: !data.workStyle.deep } })
-                                            }
-                                        >
-                                            🧠 Deep work
-                                            <span className="block text-xs mt-0.5 opacity-60">45–90 min</span>
-                                        </button>
-                                    </div>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="How should we call you?"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                    />
                                 </div>
 
-                                {/* Quiet hours */}
                                 <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-sm text-[var(--color-text-secondary)]">Quiet hours</label>
-                                        <Toggle
-                                            active={data.quietHours.enabled}
-                                            onToggle={() =>
-                                                setData({ ...data, quietHours: { ...data.quietHours, enabled: !data.quietHours.enabled } })
-                                            }
-                                        />
-                                    </div>
-                                    {data.quietHours.enabled && (
-                                        <div className="grid grid-cols-2 gap-3 mt-2">
-                                            <div>
-                                                <label className="block text-xs text-[var(--color-text-muted)] mb-1">From</label>
-                                                <input
-                                                    type="time"
-                                                    className="input-field text-sm"
-                                                    value={data.quietHours.start}
-                                                    onChange={(e) =>
-                                                        setData({ ...data, quietHours: { ...data.quietHours, start: e.target.value } })
-                                                    }
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-[var(--color-text-muted)] mb-1">To</label>
-                                                <input
-                                                    type="time"
-                                                    className="input-field text-sm"
-                                                    value={data.quietHours.end}
-                                                    onChange={(e) =>
-                                                        setData({ ...data, quietHours: { ...data.quietHours, end: e.target.value } })
-                                                    }
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Notification intensity */}
-                                <div>
-                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-2">
-                                        Notification intensity
+                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-3">
+                                        How old are you?
                                     </label>
-                                    <div className="flex gap-2">
-                                        {(['gentle', 'normal', 'strict'] as const).map((opt) => (
+                                    <div className="space-y-2">
+                                        {AGE_OPTIONS.map((bracket) => (
                                             <button
-                                                key={opt}
+                                                key={bracket}
                                                 type="button"
-                                                className={`intensity-option ${data.intensity === opt ? 'selected' : ''}`}
-                                                onClick={() => setData({ ...data, intensity: opt })}
+                                                className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 ${age === bracket
+                                                        ? 'bg-[rgba(108,92,231,0.15)] border-[var(--color-primary-light)] text-[var(--color-primary-light)]'
+                                                        : 'bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.06)] text-[var(--color-text-secondary)] hover:border-[rgba(108,92,231,0.2)]'
+                                                    }`}
+                                                onClick={() => setAge(bracket)}
                                             >
-                                                <span className="block text-base mb-0.5">
-                                                    {opt === 'gentle' ? '🌙' : opt === 'normal' ? '🔔' : '🔥'}
-                                                </span>
-                                                <span className="capitalize">{opt}</span>
+                                                <span className="font-medium">{AGE_BRACKETS[bracket].label}</span>
                                             </button>
                                         ))}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-                                {/* Location */}
-                                <div className="flex items-center justify-between">
-                                    <div className="pr-3">
-                                        <label className="text-sm text-[var(--color-text-secondary)]">Location access</label>
-                                        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                                            Detect commute / home / office context
-                                        </p>
-                                    </div>
-                                    {data.permissions.location ? (
-                                        <span className="text-xs text-[var(--color-accent)] font-medium px-3 py-1.5 rounded-lg bg-[rgba(85,239,196,0.1)]">
-                                            ✓ Enabled
-                                        </span>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            className="btn-secondary text-sm py-2 px-4"
-                                            onClick={handleLocationPermission}
-                                        >
-                                            Allow
-                                        </button>
-                                    )}
-                                </div>
+                {/* ===== STEP 1: QUESTIONS ===== */}
+                {step === 1 && insights && (
+                    <div className="card-glass p-6">
+                        <div className="flex items-center gap-2 mb-5">
+                            <span className="text-lg">💬</span>
+                            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Quick questions</h2>
+                        </div>
 
-                                {/* Motion toggle */}
-                                <div className="flex items-center justify-between">
-                                    <div className="pr-3">
-                                        <label className="text-sm text-[var(--color-text-secondary)]">
-                                            Motion / commute detection
-                                        </label>
-                                        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Optional</p>
-                                    </div>
-                                    <Toggle
-                                        active={data.permissions.motion}
-                                        onToggle={() =>
-                                            setData({ ...data, permissions: { ...data.permissions, motion: !data.permissions.motion } })
-                                        }
+                        <div className="space-y-4">
+                            {insights.questions.map((q) => (
+                                <div key={q.key}>
+                                    <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">
+                                        {q.label}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder={q.placeholder}
+                                        value={answers[q.key] || ''}
+                                        onChange={(e) => setAnswers({ ...answers, [q.key]: e.target.value })}
                                     />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* ===== STEP 2: INSIGHTS ===== */}
+                {step === 2 && insights && (
+                    <div className="space-y-4">
+                        {/* Average Day */}
+                        <div className="card-glass p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="text-lg">📊</span>
+                                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+                                    Average day for your age
+                                </h2>
+                            </div>
+                            <div className="space-y-2">
+                                {insights.avgDay.map((item, i) => (
+                                    <div key={i} className="flex items-start gap-2.5 py-1.5">
+                                        <span className="text-[var(--color-text-muted)] text-sm mt-0.5">•</span>
+                                        <span className="text-sm text-[var(--color-text-secondary)]">{item}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Do This / Avoid This */}
+                        <div className="grid grid-cols-1 gap-4">
+                            <div className="card-glass p-5">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-base">✅</span>
+                                    <h3 className="text-sm font-semibold text-[var(--color-accent)]">Do this</h3>
+                                </div>
+                                <div className="space-y-2">
+                                    {insights.doThis.map((item, i) => (
+                                        <p key={i} className="text-sm text-[var(--color-text-secondary)] leading-relaxed pl-5">
+                                            {item}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="card-glass p-5">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-base">🚫</span>
+                                    <h3 className="text-sm font-semibold text-[var(--color-danger)]">Avoid this</h3>
+                                </div>
+                                <div className="space-y-2">
+                                    {insights.avoidThis.map((item, i) => (
+                                        <p key={i} className="text-sm text-[var(--color-text-secondary)] leading-relaxed pl-5">
+                                            {item}
+                                        </p>
+                                    ))}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Connect later */}
+                        {/* Goal Picker */}
                         <div className="card-glass p-6">
                             <div className="flex items-center gap-2 mb-4">
-                                <span className="text-lg">🔗</span>
-                                <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Connect later</h2>
+                                <span className="text-lg">🎯</span>
+                                <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+                                    Pick your goals
+                                </h2>
                             </div>
-
-                            <div className="flex gap-2 mb-3">
-                                <button type="button" className="btn-secondary flex-1 justify-center text-sm">
-                                    <span>📓</span> Notion
-                                </button>
-                                <button type="button" className="btn-secondary flex-1 justify-center text-sm">
-                                    <span>📅</span> Calendar
-                                </button>
+                            <p className="text-xs text-[var(--color-text-muted)] mb-3">Tap to select. You can add your own.</p>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {insights.suggestedGoals.map((goal) => (
+                                    <button
+                                        key={goal}
+                                        type="button"
+                                        className={`chip ${selectedGoals.includes(goal) ? 'selected' : ''}`}
+                                        onClick={() => toggleGoal(goal)}
+                                    >
+                                        {selectedGoals.includes(goal) ? '✓ ' : ''}{goal}
+                                    </button>
+                                ))}
                             </div>
-                            <p className="text-xs text-[var(--color-text-muted)] text-center">
-                                You can connect apps anytime. Setup takes 30 seconds later.
-                            </p>
+                            <input
+                                type="text"
+                                className="input-field text-sm"
+                                placeholder="+ Add a custom goal"
+                                value={customGoal}
+                                onChange={(e) => setCustomGoal(e.target.value)}
+                            />
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Error toast */}
-            {submitError && (
-                <div className="fixed top-4 left-4 right-4 z-50 max-w-lg mx-auto p-3 rounded-xl bg-[rgba(255,107,107,0.15)] border border-[var(--color-danger)] text-sm text-[var(--color-danger)] text-center animate-fade-in-up">
-                    {submitError}
-                </div>
-            )}
-
-            {/* Sticky Bottom Navigation */}
+            {/* Sticky Nav */}
             <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-gradient-to-t from-[#0F0F23] via-[#0F0F23] to-transparent">
                 <div className="max-w-lg mx-auto flex gap-3">
                     {step > 0 && (
-                        <button
-                            type="button"
-                            className="btn-secondary flex-shrink-0 px-6"
-                            onClick={goBack}
-                        >
+                        <button type="button" className="btn-secondary flex-shrink-0 px-6" onClick={goBack}>
                             ← Back
                         </button>
                     )}
-                    {step < 2 ? (
-                        <button type="button" className="btn-primary flex-1" onClick={goNext}>
-                            Next →
-                        </button>
-                    ) : (
+
+                    {step === 0 && (
                         <button
                             type="button"
                             className="btn-primary flex-1"
-                            onClick={handleSubmit}
-                            disabled={submitting}
+                            disabled={!age}
+                            onClick={goNext}
                         >
-                            {submitting ? 'Saving…' : 'Finish setup ✓'}
+                            Next →
+                        </button>
+                    )}
+
+                    {step === 1 && (
+                        <button type="button" className="btn-primary flex-1" onClick={goNext}>
+                            See my insights →
+                        </button>
+                    )}
+
+                    {step === 2 && (
+                        <button
+                            type="button"
+                            className="btn-primary flex-1"
+                            disabled={submitting || selectedGoals.length === 0}
+                            onClick={handleSubmit}
+                        >
+                            {submitting ? 'Saving…' : `Start with ${selectedGoals.length} goal${selectedGoals.length !== 1 ? 's' : ''} ✓`}
                         </button>
                     )}
                 </div>

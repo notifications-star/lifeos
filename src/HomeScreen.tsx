@@ -4,11 +4,9 @@ import type { User } from '@supabase/supabase-js';
 
 interface ProfileData {
     name: string | null;
-    goals: string[];
-    intensity: string;
-    timezone: string;
-    work_style_micro: boolean;
-    work_style_deep: boolean;
+    age_bracket: string | null;
+    selected_goals: string[];
+    answers: Record<string, string>;
 }
 
 export default function HomeScreen({ user }: { user: User }) {
@@ -19,7 +17,7 @@ export default function HomeScreen({ user }: { user: User }) {
         async function fetchProfile() {
             const { data } = await supabase
                 .from('user_profiles')
-                .select('name, goals, intensity, timezone, work_style_micro, work_style_deep')
+                .select('name, age_bracket, selected_goals, answers')
                 .eq('user_id', user.id)
                 .single();
 
@@ -59,7 +57,7 @@ export default function HomeScreen({ user }: { user: User }) {
                         {greeting}, {displayName} 👋
                     </h1>
                     <p className="text-sm text-[var(--color-text-muted)] mt-1">
-                        Here's your focus for today
+                        {profile?.age_bracket ? `Age ${profile.age_bracket}` : 'Here\'s your focus'}
                     </p>
                 </div>
                 <button
@@ -70,22 +68,20 @@ export default function HomeScreen({ user }: { user: User }) {
                 </button>
             </div>
 
-            {/* Goals Card */}
-            {profile?.goals && profile.goals.length > 0 && (
+            {/* Goals */}
+            {profile?.selected_goals && profile.selected_goals.length > 0 && (
                 <div className="card-glass p-6 mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                     <div className="flex items-center gap-2 mb-4">
                         <span className="text-lg">🎯</span>
                         <h2 className="text-base font-semibold text-[var(--color-text-primary)]">Your Goals</h2>
                     </div>
-                    <div className="space-y-3">
-                        {profile.goals.map((goal, i) => (
+                    <div className="space-y-2.5">
+                        {profile.selected_goals.map((goal, i) => (
                             <div
                                 key={i}
-                                className="flex items-start gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.05)]"
+                                className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.05)]"
                             >
-                                <div className="w-6 h-6 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 mt-0.5">
-                                    {i + 1}
-                                </div>
+                                <div className="w-5 h-5 rounded-full border-2 border-[var(--color-primary-light)] flex-shrink-0" />
                                 <span className="text-sm text-[var(--color-text-secondary)]">{goal}</span>
                             </div>
                         ))}
@@ -93,42 +89,26 @@ export default function HomeScreen({ user }: { user: User }) {
                 </div>
             )}
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-3 mb-4 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                <div className="card-glass p-4 text-center">
-                    <span className="text-2xl mb-1 block">
-                        {profile?.intensity === 'gentle' ? '🌙' : profile?.intensity === 'strict' ? '🔥' : '🔔'}
-                    </span>
-                    <span className="text-xs text-[var(--color-text-muted)] capitalize">{profile?.intensity || 'Normal'} mode</span>
+            {/* Occupation */}
+            {profile?.answers?.occupation && (
+                <div className="card-glass p-5 mb-4 animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+                    <p className="text-xs text-[var(--color-text-muted)] mb-1">Current focus</p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">{profile.answers.occupation}</p>
                 </div>
-                <div className="card-glass p-4 text-center">
-                    <span className="text-2xl mb-1 block">
-                        {profile?.work_style_deep && profile?.work_style_micro ? '⚡🧠' : profile?.work_style_deep ? '🧠' : profile?.work_style_micro ? '⚡' : '—'}
-                    </span>
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                        {profile?.work_style_deep && profile?.work_style_micro
-                            ? 'Mixed style'
-                            : profile?.work_style_deep
-                                ? 'Deep work'
-                                : profile?.work_style_micro
-                                    ? 'Micro tasks'
-                                    : 'No preference'}
-                    </span>
-                </div>
-            </div>
+            )}
 
-            {/* What to do now placeholder */}
-            <div className="card-glass p-6 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+            {/* Coming soon */}
+            <div className="card-glass p-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
                 <div className="flex items-center gap-2 mb-3">
                     <span className="text-lg">💡</span>
                     <h2 className="text-base font-semibold text-[var(--color-text-primary)]">What should I do now?</h2>
                 </div>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                    Suggestions based on your goals and schedule will appear here soon.
+                <p className="text-sm text-[var(--color-text-muted)] mb-4">
+                    AI-powered suggestions based on your age, goals, and daily patterns.
                 </p>
-                <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-[rgba(108,92,231,0.1)] to-[rgba(0,206,201,0.1)] border border-[rgba(108,92,231,0.15)]">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-[rgba(108,92,231,0.1)] to-[rgba(0,206,201,0.1)] border border-[rgba(108,92,231,0.15)]">
                     <p className="text-sm text-[var(--color-primary-light)]">
-                        🚀 Coming soon — AI-powered task suggestions
+                        🚀 Coming soon
                     </p>
                 </div>
             </div>

@@ -2,31 +2,33 @@ import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import AuthScreen from './AuthScreen';
 import OnboardingForm from './OnboardingForm';
-import HomeScreen from './HomeScreen';
+import MainApp from './MainApp';
 import type { User } from '@supabase/supabase-js';
 
-type AppState = 'loading' | 'auth' | 'onboarding' | 'home';
+type AppState = 'loading' | 'auth' | 'onboarding' | 'app';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('loading');
   const [user, setUser] = useState<User | null>(null);
+  const [userName, setUserName] = useState('Alex');
 
   useEffect(() => {
-    // Check initial session
+    // Set initial theme
+    document.documentElement.setAttribute('data-theme', 'light');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        checkOnboardingStatus(session.user.id);
+        checkOnboardingStatus(session.user);
       } else {
         setAppState('auth');
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user);
-        checkOnboardingStatus(session.user.id);
+        checkOnboardingStatus(session.user);
       } else {
         setUser(null);
         setAppState('auth');
@@ -36,37 +38,41 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function checkOnboardingStatus(userId: string) {
+  async function checkOnboardingStatus(u: User) {
     const { data } = await supabase
       .from('user_profiles')
-      .select('onboarding_complete')
-      .eq('user_id', userId)
+      .select('onboarding_complete, name')
+      .eq('user_id', u.id)
       .single();
 
     if (data?.onboarding_complete) {
-      setAppState('home');
+      setUserName(data.name || u.email?.split('@')[0] || 'Alex');
+      setAppState('app');
     } else {
       setAppState('onboarding');
     }
   }
 
   const handleOnboardingComplete = () => {
-    setAppState('home');
+    // Re-check to get the name
+    if (user) {
+      checkOnboardingStatus(user);
+    } else {
+      setAppState('app');
+    }
   };
 
   return (
     <>
-      {/* Background orbs */}
-      <div className="bg-orb bg-orb-1" />
-      <div className="bg-orb bg-orb-2" />
-
       {appState === 'loading' && (
-        <div className="flex items-center justify-center min-h-dvh relative z-10">
-          <div className="text-center animate-fade-in-up">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] flex items-center justify-center text-2xl shadow-lg shadow-[rgba(108,92,231,0.3)]">
-              ⚡
-            </div>
-            <p className="text-[var(--color-text-muted)] animate-pulse">Loading…</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: 64, height: 64, margin: '0 auto 16px', borderRadius: 20,
+              background: 'linear-gradient(135deg, var(--lavender-dark), var(--sky-dark))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+            }}>⚡</div>
+            <p style={{ color: 'var(--text3)' }}>Loading…</p>
           </div>
         </div>
       )}
@@ -77,7 +83,7 @@ export default function App() {
         <OnboardingForm user={user} onComplete={handleOnboardingComplete} />
       )}
 
-      {appState === 'home' && user && <HomeScreen user={user} />}
+      {appState === 'app' && <MainApp userName={userName} onLogout={() => supabase.auth.signOut()} />}
     </>
   );
 }
