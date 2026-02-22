@@ -15,7 +15,7 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
         {
             id: 'ai-welcome',
             type: 'ai',
-            text: "Hey! 👀 I'm your LifeOS Mom — I track your schedule, tasks, and habits so you don't have to. Ask me anything about your day, or let me help you stay on track. What's up?",
+            text: "Hey! 👀 I'm your Momentum Mom — I track your schedule, tasks, and habits so you don't have to. Ask me anything about your day, or let me help you stay on track. What's up?",
             time: formatTime(),
         },
     ]);
@@ -161,7 +161,7 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
             <div className="chat-header">
                 <div className="chat-avatar">🤖</div>
                 <div className="chat-info">
-                    <div className="chat-name">LifeOS Mom</div>
+                    <div className="chat-name">Momentum Mom</div>
                     <div className="chat-status">● Powered by GPT-5 Nano</div>
                 </div>
                 <div className="theme-toggle" onClick={onToggleTheme}>{isDark ? '☀️' : '🌙'}</div>
@@ -178,7 +178,7 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
 
                 {typing && (
                     <div className="msg ai">
-                        <div className="msg-bubble" style={{ color: 'var(--text3)' }}>LifeOS is thinking...</div>
+                        <div className="msg-bubble" style={{ color: 'var(--text3)' }}>Momentum is thinking...</div>
                     </div>
                 )}
 
@@ -210,7 +210,7 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
                 </button>
                 <input
                     className="chat-input"
-                    placeholder="Talk to LifeOS Mom..."
+                    placeholder="Talk to Momentum Mom..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}

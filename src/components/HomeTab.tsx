@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { loadEvents, addEvent, deleteEvent, loadTodayLog, saveDailyLog, loadGoals, addGoal, deleteGoal, loadTasks, type AppEvent, type DailyLog, type Goal, type Task } from '../services/data';
+import { loadEvents, addEvent, deleteEvent, loadTodayLog, saveDailyLog, loadGoals, addGoal, deleteGoal, loadTasks, injectMockData, type AppEvent, type DailyLog, type Goal, type Task } from '../services/data';
 
 export default function HomeTab({ onSwitchTab, onToggleTheme, isDark, userName, onLogout }: {
     onSwitchTab: (tab: string) => void;
@@ -21,10 +21,28 @@ export default function HomeTab({ onSwitchTab, onToggleTheme, isDark, userName, 
     const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     useEffect(() => {
-        loadEvents().then(setEvents);
-        loadTasks().then(setTasks);
-        loadTodayLog().then(setLog);
-        loadGoals().then(setGoals);
+        async function loadAll() {
+            // First try loading existing data
+            let [e, t, l, g] = await Promise.all([
+                loadEvents(), loadTasks(), loadTodayLog(), loadGoals()
+            ]);
+
+            // If completely empty, inject mock data and reload
+            if (e.length === 0 && t.length === 0 && g.length === 0) {
+                const injected = await injectMockData();
+                if (injected) {
+                    [e, t, l, g] = await Promise.all([
+                        loadEvents(), loadTasks(), loadTodayLog(), loadGoals()
+                    ]);
+                }
+            }
+
+            setEvents(e);
+            setTasks(t);
+            setLog(l);
+            setGoals(g);
+        }
+        loadAll();
     }, []);
 
     const activeTasks = tasks.filter(t => !t.done);
@@ -72,7 +90,7 @@ export default function HomeTab({ onSwitchTab, onToggleTheme, isDark, userName, 
                         <div className="now-sub">No tasks yet. Add some tasks or chat with me about your plans.</div>
                     </>
                 )}
-                <button className="now-cta" onClick={() => onSwitchTab('chat')}>💬 Chat with LifeOS Mom</button>
+                <button className="now-cta" onClick={() => onSwitchTab('chat')}>💬 Chat with Momentum Mom</button>
             </div>
 
             {/* Daily Log */}

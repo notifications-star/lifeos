@@ -17,7 +17,7 @@ export default function PushNotification({ onTap }: { onTap: () => void }) {
             <div className={`push-notif ${show ? 'show' : ''}`} onClick={() => { setShow(false); setDismissed(true); onTap(); }}>
                 <div className="push-icon" style={{ background: 'var(--peach)' }}>🤔</div>
                 <div className="push-content">
-                    <div className="push-app">LifeOS · Smart Nudge</div>
+                    <div className="push-app">Momentum · Smart Nudge</div>
                     <div className="push-title">Hey — CS 301 is due at 11:59 PM</div>
                     <div className="push-body">You're at a party right now. Do you still plan on finishing it tonight?</div>
                     <div className="push-tap">Tap to explain →</div>

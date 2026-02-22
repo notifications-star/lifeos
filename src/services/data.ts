@@ -140,6 +140,60 @@ export async function loadTasks(): Promise<Task[]> {
     return data || [];
 }
 
+// ═══ MOCK DATA INJECTION ═══
+export async function injectMockData(): Promise<boolean> {
+    const uid = await getUserId();
+    if (!uid) return false;
+
+    // Only inject if they have literally no data
+    const [tasks, events, goals] = await Promise.all([
+        loadTasks(), loadEvents(), loadGoals()
+    ]);
+
+    if (tasks.length > 0 || events.length > 0 || goals.length > 0) return false;
+
+    console.log('Injecting mock data for new user...');
+    const today = new Date().toISOString().split('T')[0];
+
+    // Inject Goals
+    await supabase.from('goals').insert([
+        { user_id: uid, name: 'Run a 5k under 25m', category: 'health', target: '3 runs/week' },
+        { user_id: uid, name: 'Read 2 books a month', category: 'personal', target: '20 pages/day' },
+        { user_id: uid, name: 'Ship side project MVP', category: 'career', target: 'End of month' }
+    ]);
+
+    // Inject Events
+    await supabase.from('events').insert([
+        { user_id: uid, name: 'Morning Sync', emoji: '👥', event_date: today, start_time: '10:00 AM', end_time: '10:30 AM', location: 'Zoom' },
+        { user_id: uid, name: 'Lunch with Sarah', emoji: '🍽', event_date: today, start_time: '12:30 PM', end_time: '1:30 PM', location: 'Cafe Mila' },
+        { user_id: uid, name: 'Gym Session', emoji: '🏋️', event_date: today, start_time: '6:00 PM', end_time: '7:00 PM', location: 'Equinox' }
+    ]);
+
+    // Inject Tasks
+    await supabase.from('tasks').insert([
+        { user_id: uid, name: 'Review Q3 roadmap slides', done: true, due_label: 'Today', source: 'Work', priority: 'today', sort_order: 1 },
+        { user_id: uid, name: 'Call mom for her birthday', done: false, due_label: 'Evening', source: 'Personal', priority: 'today', sort_order: 2 },
+        { user_id: uid, name: 'Buy groceries: eggs, milk, spinach', done: false, due_label: 'After work', source: 'Home', priority: 'today', sort_order: 3 },
+        { user_id: uid, name: 'Read chapter 4 of Clean Code', done: false, due_label: 'Tonight', source: 'Personal', priority: 'upcoming', sort_order: 4 },
+        { user_id: uid, name: 'Fix bug in auth flow', done: true, due_label: 'Morning', source: 'Work', priority: 'today', sort_order: 0 }
+    ]);
+
+    // Inject Daily Log
+    await supabase.from('daily_logs').insert({
+        user_id: uid,
+        log_date: today,
+        sleep_hours: 6.5,
+        steps: 4200,
+        screen_time_min: 195,
+        water_glasses: 3,
+        mood: 'good',
+        energy: 'medium',
+        notes: 'Slept a bit late, but got a lot done this morning. Need to drink more water.'
+    });
+
+    return true;
+}
+
 // ═══ BUILD AI CONTEXT ═══
 export async function buildAIContext(): Promise<string> {
     const [tasks, events, log, goals] = await Promise.all([

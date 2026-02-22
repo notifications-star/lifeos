@@ -48,7 +48,7 @@ export default function AuthScreen() {
                     <div className="auth-logo">
                         <span className="auth-logo-icon">⚡</span>
                     </div>
-                    <h1 className="auth-title">LifeOS</h1>
+                    <h1 className="auth-title">Momentum</h1>
                     <p className="auth-subtitle">Your AI-powered life engine</p>
                 </div>
 

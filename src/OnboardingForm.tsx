@@ -59,7 +59,7 @@ export default function OnboardingForm({ user, onComplete }: { user: User; onCom
                             <div style={{ textAlign: 'center', marginBottom: 24 }}>
                                 <div style={{ fontSize: 40, marginBottom: 12 }}>👋</div>
                                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 6 }}>What's your name?</h2>
-                                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>So LifeOS Mom knows what to call you</p>
+                                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>So Momentum Mom knows what to call you</p>
                             </div>
                             <div className="auth-field">
                                 <input placeholder="Your first name" value={name}
