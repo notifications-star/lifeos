@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { sendToAI, type ChatMessage } from '../services/openai';
+import { parseActions, executeActions } from '../services/actions';
 import { supabase } from '../supabaseClient';
 
 interface DisplayMessage {
@@ -21,6 +22,7 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
     const [input, setInput] = useState('');
     const [typing, setTyping] = useState(false);
     const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
+    const [listening, setListening] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -102,13 +104,55 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
         const aiResponse = await sendToAI(updatedHistory);
         setTyping(false);
 
-        const aiMsg: DisplayMessage = { id: `ai-${Date.now()}`, type: 'ai', text: aiResponse, time: formatTime() };
+        // Parse and execute actions
+        const { cleanText, actions } = parseActions(aiResponse);
+        let finalText = cleanText;
+
+        if (actions.length > 0) {
+            const results = await executeActions(actions);
+            // Append action summaries to the AI's response text so the user sees what happened
+            if (results.length > 0) {
+                finalText += '\n\n' + results.join('\n');
+            }
+        }
+
+        const aiMsg: DisplayMessage = { id: `ai-${Date.now()}`, type: 'ai', text: finalText, time: formatTime() };
         setMessages((prev) => [...prev, aiMsg]);
 
-        setConversationHistory((prev) => [...prev, { role: 'assistant', content: aiResponse }]);
+        setConversationHistory((prev) => [...prev, { role: 'assistant', content: aiResponse }]); // keep raw resp in history
 
         // Save AI response to DB
-        saveToDB('assistant', aiResponse);
+        saveToDB('assistant', finalText);
+    };
+
+    const startListening = () => {
+        if (listening) return;
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Speech recognition is not supported in this browser.');
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => setListening(true);
+
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setInput(prev => prev ? prev + ' ' + transcript : transcript);
+        };
+
+        recognition.onerror = (event: any) => {
+            console.error('Speech recognition error:', event.error);
+            setListening(false);
+        };
+
+        recognition.onend = () => setListening(false);
+
+        recognition.start();
     };
 
     return (
@@ -143,15 +187,36 @@ export default function ChatTab({ onToggleTheme, isDark }: { onToggleTheme: () =
 
             {/* Input */}
             <div className="chat-input-bar">
+                <button
+                    onClick={startListening}
+                    disabled={typing}
+                    style={{
+                        background: listening ? 'var(--rose-dark)' : 'var(--surface2)',
+                        color: listening ? '#fff' : 'var(--text)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 14,
+                        width: 42,
+                        height: 42,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 18,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: listening ? '0 0 15px var(--rose-dark)' : 'none',
+                    }}
+                >
+                    {listening ? '🔴' : '🎤'}
+                </button>
                 <input
                     className="chat-input"
                     placeholder="Talk to LifeOS Mom..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    disabled={typing}
+                    disabled={typing || listening}
                 />
-                <button className="chat-send" onClick={handleSend} disabled={typing}>↑</button>
+                <button className="chat-send" onClick={handleSend} disabled={typing || listening || !input.trim()}>↑</button>
             </div>
         </div>
     );
