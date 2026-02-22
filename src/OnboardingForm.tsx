@@ -32,7 +32,7 @@ const COMMON_TIMEZONES = [
     'America/Sao_Paulo', 'America/Buenos_Aires', 'America/Bogota',
     'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid',
     'Europe/Rome', 'Europe/Amsterdam', 'Europe/Moscow',
-    'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Singapore',
+    'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Jakarta', 'Asia/Singapore',
     'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Hong_Kong',
     'Australia/Sydney', 'Australia/Melbourne', 'Pacific/Auckland',
     'Africa/Lagos', 'Africa/Cairo', 'Africa/Johannesburg',
@@ -67,20 +67,20 @@ function StepIndicator({ step }: { step: number }) {
                         <div className="flex items-center gap-2">
                             <div
                                 className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-500 ${isComplete
-                                        ? 'bg-[var(--color-accent)] text-[#0F0F23] scale-90'
-                                        : isCurrent
-                                            ? 'bg-[var(--color-primary)] text-white ring-4 ring-[rgba(108,92,231,0.25)]'
-                                            : 'bg-[var(--color-surface-input)] text-[var(--color-text-muted)]'
+                                    ? 'bg-[var(--color-accent)] text-[#0F0F23] scale-90'
+                                    : isCurrent
+                                        ? 'bg-[var(--color-primary)] text-white ring-4 ring-[rgba(108,92,231,0.25)]'
+                                        : 'bg-[var(--color-surface-input)] text-[var(--color-text-muted)]'
                                     }`}
                             >
                                 {isComplete ? '✓' : i + 1}
                             </div>
                             <span
                                 className={`text-sm font-medium hidden sm:inline transition-colors duration-300 ${isComplete
-                                        ? 'text-[var(--color-accent)]'
-                                        : isCurrent
-                                            ? 'text-[var(--color-text-primary)]'
-                                            : 'text-[var(--color-text-muted)]'
+                                    ? 'text-[var(--color-accent)]'
+                                    : isCurrent
+                                        ? 'text-[var(--color-text-primary)]'
+                                        : 'text-[var(--color-text-muted)]'
                                     }`}
                             >
                                 {label}
