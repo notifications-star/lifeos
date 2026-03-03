@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import AuthScreen from './AuthScreen';

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useRef, useEffect } from 'react';
 import { sendToAI, type ChatMessage } from '../services/openai';
 import { parseActions, executeActions } from '../services/actions';

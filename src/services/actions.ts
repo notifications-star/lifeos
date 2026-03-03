@@ -2,6 +2,7 @@ import { supabase } from '../supabaseClient';
 
 export interface AIAction {
     type: 'add_task' | 'add_event' | 'add_goal' | 'log_stats' | 'complete_task';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: Record<string, any>;
 }
 
@@ -21,7 +22,7 @@ export function parseActions(text: string): { cleanText: string; actions: AIActi
             } else {
                 actions.push(parsed);
             }
-        } catch (e) {
+        } catch {
             console.log('Failed to parse action:', block);
         }
         return '';
@@ -111,7 +112,8 @@ export async function executeActions(actions: AIAction[]): Promise<string[]> {
                 }
             }
         } catch (err) {
-            results.push(`❌ Error: ${err}`);
+            console.log(err);
+            results.push(`❌ Error`);
         }
     }
 
